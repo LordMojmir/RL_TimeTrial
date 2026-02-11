@@ -34,7 +34,7 @@ class Game:
         self.state = "MENU" # MENU or PLAYING
         
         # Training Config
-        self.parallel_cars = 75
+        self.parallel_cars = 1000
         
         # Lap logic state
         self.crossed_start_line = False 
@@ -503,9 +503,14 @@ class Game:
                      # Draw uses self.x/y/angle so we are good.
                      g['car'].draw(self.screen)
              
-             # Draw UI
+             message_y = 50
              msg = self.font.render("REPLAYING BEST RUNS (Press R to return)", True, (255, 255, 0))
-             self.screen.blit(msg, (SCREEN_WIDTH/2 - msg.get_width()/2, 50))
+             self.screen.blit(msg, (SCREEN_WIDTH/2 - msg.get_width()/2, message_y))
+             
+             # Replay Timer
+             replay_time = step / 60.0 # Assuming 60 FPS
+             timer_msg = self.font.render(f"Replay Time: {replay_time:.2f}s", True, WHITE)
+             self.screen.blit(timer_msg, (SCREEN_WIDTH/2 - timer_msg.get_width()/2, message_y + 30))
              
              pygame.display.flip()
              self.clock.tick(60)

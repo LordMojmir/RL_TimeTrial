@@ -101,7 +101,7 @@ class CarRacingEnv(gym.Env):
                     # Basic check: if lap time > 3s (very fast lap, but avoids instant trigger)
                     if self.game.lap_start_time != 0:
                         lap_time = (current_time - self.game.lap_start_time) / 1000.0
-                        if lap_time > 3.0: 
+                        if lap_time > 4.0: 
                             reward += 1000
                             # Reset for next lap
                             self.game.lap_start_time = current_time
