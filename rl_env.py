@@ -68,6 +68,7 @@ class CarRacingEnv(gym.Env):
         terminated = False
         truncated = False
         reward = -0.1 # Base Time penalty
+        info = {}
         
         if self.game.track.check_collision(car.rect):
             terminated = True
@@ -104,6 +105,7 @@ class CarRacingEnv(gym.Env):
                             reward += 1000
                             # Reset for next lap
                             self.game.lap_start_time = current_time
+                            info['lap_time'] = lap_time
                     else:
                          # First crossing
                          self.game.lap_start_time = current_time
@@ -112,14 +114,7 @@ class CarRacingEnv(gym.Env):
                 self.game.crossed_start_line = False
         
         # Get obs for next step
-        # Note: we already cast rays above, optimizing would be to reuse them
-        # But _get_obs calls cast_rays again. For now, it's fine.
-        # To optimize:
-        # observation = np.array(rays + car.get_data(), dtype=np.float32)
-        # But let's stick to calling _get_obs to be clean unless performance is bad.
-        
         observation = self._get_obs()
-        info = {}
         
         if self.render_mode == "human":
             self.render()

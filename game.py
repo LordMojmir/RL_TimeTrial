@@ -34,7 +34,7 @@ class Game:
         self.state = "MENU" # MENU or PLAYING
         
         # Training Config
-        self.parallel_cars = 100
+        self.parallel_cars = 75
         
         # Lap logic state
         self.crossed_start_line = False 
@@ -254,6 +254,8 @@ class Game:
         global_step = 0
         epoch_count = 0
         self.best_reward_so_far = -float('inf')
+        self.best_times = []
+        car_histories = [[] for _ in range(num_envs)] # List of lists of tuples (x,y,angle)
         
         # Reset all
         next_obs = np.array([env.reset()[0] for env in envs])
@@ -297,13 +299,10 @@ class Game:
                 step_rewards = []
                 step_dones = []
                 step_next_obs = []
+                infos = []
                 
                 for i, env in enumerate(envs):
                     # action[i] is [steering] (shape 1)
-                    # SyncVectorEnv usually handles array actions, we emulate it
-                    # action is (N, 1) or (N,) depending on output. PPO returns (N, 1) usually or (N,)
-                    # My PPO select_action returns numpy array. 
-                    # If output is 1, it might be (N, 1). 
                     
                     act = action[i] # This is [steering]
                     
@@ -316,6 +315,7 @@ class Game:
                     step_rewards.append(reward)
                     step_dones.append(done)
                     step_next_obs.append(obs)
+                    infos.append(info)
                 
                 # Turn back to numpy arrays
                 obs_batch = np.array(step_next_obs)
@@ -334,11 +334,66 @@ class Game:
                 
                 # RENDER ALL CARS
                 self.track.draw(self.screen) # Draw background
-                for env in envs:
-                    env.game.car.draw(self.screen) # Draw each car
                 
-                pygame.display.set_caption(f"Training... Epoch: {epoch_count} | Cars: {num_envs}")
+                # Check for input to toggle Replay Mode
+                keys = pygame.key.get_pressed()
+                if keys[pygame.K_r] and len(self.best_times) > 0:
+                     self.replay_best_runs()
+
+                for i, env in enumerate(envs):
+                    env.game.car.draw(self.screen) # Draw each car
+                    
+                    # RECORD HISTORY
+                    # We need to access the car's current state
+                    c = env.game.car
+                    # If this car is active (not done yet this episode, or better, just record everything)
+                    # We'll reset history on env.reset() but we don't have easy hook here unless we check done
+                    if len(car_histories) <= i:
+                        car_histories.append([])
+                    
+                    car_histories[i].append((c.x, c.y, c.angle))
+                
+                # Check for lap times
+                for i, info in enumerate(infos):
+                    if 'lap_time' in info:
+                        l_time = info['lap_time']
+                        # Record the history for this successful lap
+                        # The history in car_histories[i] is for the current episode. 
+                        # Since we reset on done, and lap completion doesn't necessarily mean done (unless we force it),
+                        # ASsuming "one lap" episode for simplicity or we just take current buffer.
+                        # Wait, env.reset() clears history? No, we need to clear it manually.
+                        
+                        # Copy current history
+                        lap_history = list(car_histories[i])
+                        
+                        # Add to leaderboard
+                        self.best_times.append({'time': l_time, 'epoch': epoch_count, 'car': i, 'history': lap_history})
+                        # Sort by time (asc)
+                        self.best_times.sort(key=lambda x: x['time'])
+                        self.best_times = self.best_times[:3]
+                        print(f"Car {i} finished lap in {l_time:.2f}s")
+                
+                # Draw UI (Leaderboard & Stats)
+                # Epoch
+                epoch_text = self.font.render(f"Epoch: {epoch_count} | Cars: {num_envs}", True, WHITE)
+                self.screen.blit(epoch_text, (10, 10))
+                
+                # Leaderboard
+                lb_title = self.font.render("Best 3 Times (Press R to Replay):", True, WHITE)
+                self.screen.blit(lb_title, (SCREEN_WIDTH - 300, 10))
+                
+                for idx, entry in enumerate(self.best_times):
+                    # entry is dict
+                    time_str = f"{idx+1}. {entry['time']:.2f}s (Ep {entry['epoch']})"
+                    lb_text = self.font.render(time_str, True, WHITE)
+                    self.screen.blit(lb_text, (SCREEN_WIDTH - 300, 40 + idx * 30))
+                
                 pygame.display.flip()
+                
+                # Clear history for cars that are done
+                for i, done in enumerate(step_dones):
+                    if done:
+                        car_histories[i] = []
 
             if not training_running: break
 
@@ -406,6 +461,59 @@ class Game:
         # Reset window for normal play if we exit training
         if self.running and not self.headless:
              self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+    def replay_best_runs(self):
+        # Playback the best runs recorded in self.best_times
+        print("Replaying Best Runs...")
+        import time
+        from car import Car
+        
+        # Create ghost cars
+        ghosts = []
+        for entry in self.best_times:
+             c = Car(0, 0) # Dummy car for rendering, x/y overriden by history
+             ghosts.append({'car': c, 'history': entry['history'], 'color': (0, 255, 255)}) # Cyan for ghosts
+             
+        # Find max length
+        max_steps = max([len(g['history']) for g in ghosts])
+        
+        replay_running = True
+        step = 0
+        
+        while replay_running:
+             for event in pygame.event.get():
+                 if event.type == pygame.QUIT:
+                     replay_running = False
+                     self.running = False
+                 if event.type == pygame.KEYDOWN:
+                     if event.key == pygame.K_ESCAPE or event.key == pygame.K_r:
+                         replay_running = False
+             
+             self.track.draw(self.screen)
+             
+             # Draw Ghosts
+             for g in ghosts:
+                 hist = g['history']
+                 if step < len(hist):
+                     x, y, angle = hist[step]
+                     g['car'].x = x
+                     g['car'].y = y
+                     g['car'].angle = angle
+                     
+                     # Draw uses self.x/y/angle so we are good.
+                     g['car'].draw(self.screen)
+             
+             # Draw UI
+             msg = self.font.render("REPLAYING BEST RUNS (Press R to return)", True, (255, 255, 0))
+             self.screen.blit(msg, (SCREEN_WIDTH/2 - msg.get_width()/2, 50))
+             
+             pygame.display.flip()
+             self.clock.tick(60)
+             
+             step += 1
+             if step >= max_steps:
+                 step = 0 # Loop
+                 time.sleep(1) # Pause before restart
 
     def run(self):
         while self.running:
