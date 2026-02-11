@@ -4,13 +4,20 @@ from utils import *
 from car import Car
 from track import Track
 
+import numpy as np
+
 class Game:
-    def __init__(self):
+    def __init__(self, headless=False):
         pygame.init()
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption(CAPTION)
+        self.headless = headless
+        if not headless:
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+            pygame.display.set_caption(CAPTION)
+            self.font = pygame.font.SysFont("Verdana", 24)
+        else:
+            self.screen = None
+            
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Verdana", 24)
         self.running = True
         
         self.track = Track()
@@ -25,6 +32,9 @@ class Game:
         
         # Game State
         self.state = "MENU" # MENU or PLAYING
+        
+        # Training Config
+        self.parallel_cars = 100
         
         # Lap logic state
         self.crossed_start_line = False 
@@ -136,6 +146,266 @@ class Game:
         self.car.reset(start_x, start_y)
         self.lap_start_time = 0
         self.crossed_start_line = False
+
+
+
+    def handle_input(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            if event.type == pygame.KEYDOWN:
+                if self.state == "MENU":
+                    if event.key == pygame.K_RETURN:
+                        self.state = "PLAYING"
+                        self.reset()
+                    if event.key == pygame.K_t:
+                        self.start_training()
+                    if event.key == pygame.K_w:
+                        self.watch_agent()
+                    if event.key == pygame.K_ESCAPE:
+                        self.running = False
+                    if event.key == pygame.K_UP:
+                        self.parallel_cars = min(self.parallel_cars + 1, 16)
+                    if event.key == pygame.K_DOWN:
+                        self.parallel_cars = max(self.parallel_cars - 1, 1)
+                        
+                elif self.state == "PLAYING":
+                    if event.key == pygame.K_r:
+                        self.reset()
+                    if event.key == pygame.K_ESCAPE:
+                        self.state = "MENU"
+        
+        if self.state == "PLAYING":
+            self.car.handle_input()
+
+    def load_model(self):
+        # We need an agent instance to load into?
+        # Or just flag that we want to load? 
+        # For simplicity, let's create a global agent or just confirm loading.
+        # But we don't have an agent instance in Game usually (only in start_training).
+        # We should probably persist the agent in Game if we want to Load then Train/Watch.
+        
+        # NOTE: For this architecture, let's just create a dummy agent to check file exists or just set a flag
+        # self.agent_path = "ppo_model.pth"
+        pass 
+
+    def watch_agent(self):
+        import gymnasium as gym
+        from rl_env import CarRacingEnv
+        from agent import PPOAgent
+        
+        env = CarRacingEnv(render_mode="human")
+        agent = PPOAgent(num_inputs=7, num_outputs=2)
+        try:
+            agent.load("ppo_model.pth")
+            print("Model loaded.")
+        except:
+            print("No model found, using random weights.")
+            
+        obs, _ = env.reset()
+        done = False
+        
+        running = True
+        while running:
+             for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    self.running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                        self.state = "MENU"
+             
+             action, _, _ = agent.select_action(obs)
+             obs, reward, terminated, truncated, _ = env.step(action)
+             done = terminated or truncated
+             
+             if done:
+                 obs, _ = env.reset()
+                 
+        env.close()
+        if self.running and not self.headless:
+             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+    def start_training(self):
+        # Import here to avoid circular dependencies if any, or just for clarity
+        import gymnasium as gym
+        from rl_env import CarRacingEnv
+        from agent import PPOAgent
+        
+        num_envs = self.parallel_cars
+        
+        # Manual List of Envs instead of SyncVectorEnv to allow custom rendering of ALL cars
+        # We pass headless=True to all because WE (the main Game) will handle rendering
+        envs = [CarRacingEnv(render_mode="rgb_array") for _ in range(num_envs)]
+        
+        # Agent input 7, output 1 (Steering only)
+        agent = PPOAgent(num_inputs=7, num_outputs=1)
+        
+        # Try load if exists
+        try:
+            agent.load("ppo_model.pth")
+            print("Resuming training from ppo_model.pth")
+        except:
+            print("Starting new training.")
+
+        # Training Config
+        num_steps = 2048
+        global_step = 0
+        epoch_count = 0
+        self.best_reward_so_far = -float('inf')
+        
+        # Reset all
+        next_obs = np.array([env.reset()[0] for env in envs])
+        next_done = np.zeros(num_envs)
+        
+        print("Starting Training...")
+        
+        training_running = True
+        while training_running:
+            # Data collection
+            states = []
+            actions = []
+            log_probs = []
+            rewards = []
+            dones = []
+            values = []
+            
+            for step in range(num_steps):
+                global_step += 1
+                
+                # Check for exit/render events
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        training_running = False
+                        self.running = False
+                        break
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            training_running = False
+                            self.state = "MENU"
+                            break
+                        if event.key == pygame.K_s:
+                            agent.save("ppo_model.pth")
+                            print("Model saved.")
+                if not training_running: break
+                
+                # Action
+                action, log_prob, value = agent.select_action(next_obs)
+                
+                # Step all envs manually
+                step_rewards = []
+                step_dones = []
+                step_next_obs = []
+                
+                for i, env in enumerate(envs):
+                    # action[i] is [steering] (shape 1)
+                    # SyncVectorEnv usually handles array actions, we emulate it
+                    # action is (N, 1) or (N,) depending on output. PPO returns (N, 1) usually or (N,)
+                    # My PPO select_action returns numpy array. 
+                    # If output is 1, it might be (N, 1). 
+                    
+                    act = action[i] # This is [steering]
+                    
+                    obs, reward, terminated, truncated, info = env.step(act)
+                    done = terminated or truncated
+                    
+                    if done:
+                        obs, _ = env.reset()
+                        
+                    step_rewards.append(reward)
+                    step_dones.append(done)
+                    step_next_obs.append(obs)
+                
+                # Turn back to numpy arrays
+                obs_batch = np.array(step_next_obs)
+                reward_batch = np.array(step_rewards)
+                done_batch = np.array(step_dones)
+                
+                states.append(next_obs)
+                actions.append(action)
+                log_probs.append(log_prob)
+                rewards.append(reward_batch)
+                dones.append(next_done)
+                values.append(value)
+                
+                next_obs = obs_batch
+                next_done = done_batch
+                
+                # RENDER ALL CARS
+                self.track.draw(self.screen) # Draw background
+                for env in envs:
+                    env.game.car.draw(self.screen) # Draw each car
+                
+                pygame.display.set_caption(f"Training... Epoch: {epoch_count} | Cars: {num_envs}")
+                pygame.display.flip()
+
+            if not training_running: break
+
+            # Compute GAE and Update
+            _, _, next_value = agent.select_action(next_obs)
+            
+            # Helper for GAE (needs list of rewards [steps, envs])
+            # My GAE function expects 1D lists or needs update.
+            # agent.compute_gae was written for 1D.
+            # We need to compute GAE for each env separately or vectorize GAE.
+            # Simple approach: Loop over envs to compute returns, then flatten.
+            
+            # Reshape data to [envs, steps] for easier GAE
+            # rewards: [steps, envs] -> [envs, steps]
+            r_T = np.array(rewards).T
+            d_T = np.array(dones).T
+            v_T = np.array(values).T
+            nv_T = next_value # (envs,)
+            
+            # We need to update compute_gae in agent to handle this or loop here
+            # Let's loop here for simplicity and robustness
+            all_returns = []
+            
+            for i in range(num_envs):
+                # rewards for env i
+                env_rewards = r_T[i]
+                env_dones = d_T[i] # actually masks? "dones" is usually "is done". GAE needs "mask" (1-done)
+                env_values = v_T[i]
+                env_next_val = nv_T[i]
+                
+                env_masks = 1 - env_dones
+                
+                # We need list inputs for my simple agent.compute_gae
+                env_returns = agent.compute_gae(env_next_val, env_rewards.tolist(), env_masks.tolist(), env_values.tolist())
+                all_returns.append(env_returns)
+            
+            # Now flatten everything for PPO update
+            # states: [steps, envs, 7] -> [steps * envs, 7]
+            b_states = np.array(states).reshape(-1, 7)
+            b_actions = np.array(actions).reshape(-1, 1) # Action dim 1
+            b_log_probs = np.array(log_probs).reshape(-1)
+            b_returns = np.array(all_returns).T.reshape(-1) # Tanspose back to [steps, envs] then flatten
+            b_values = np.array(values).reshape(-1)
+            b_advantages = b_returns - b_values
+            
+            agent.update(b_states, b_actions, b_log_probs, b_returns, b_advantages)
+            
+            epoch_count += 1
+            avg_reward = np.mean(rewards)
+            print(f"Epoch {epoch_count} Complete. Avg Reward: {avg_reward}")
+            
+            # Save if best
+            if avg_reward > self.best_reward_so_far:
+                self.best_reward_so_far = avg_reward
+                agent.save("ppo_model.pth")
+                print(f"New Best Reward! Model Saved. ({avg_reward:.2f})")
+            
+            # periodic save backup
+            if epoch_count % 10 == 0:
+                 agent.save("ppo_checkpoint.pth")
+
+        for env in envs: 
+            env.close()
+            
+        # Reset window for normal play if we exit training
+        if self.running and not self.headless:
+             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def run(self):
         while self.running:

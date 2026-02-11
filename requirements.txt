@@ -1,1 +1,4 @@
 pygame
+torch
+gymnasium
+numpy

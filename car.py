@@ -35,22 +35,15 @@ class Car:
         if keys[pygame.K_RIGHT]:
             self.angle -= CAR_TURN_SPEED * (self.speed / CAR_MAX_SPEED)
 
-        # Acceleration / Braking
-        if keys[pygame.K_UP]:
-            self.speed += CAR_ACCELERATION
-        elif keys[pygame.K_DOWN]:
-            self.speed -= CAR_BRAKING
-        else:
-            # Friction
-            if self.speed > 0:
-                self.speed -= CAR_FRICTION
-            elif self.speed < 0:
-                self.speed += CAR_FRICTION
-            if abs(self.speed) < CAR_FRICTION:
-                self.speed = 0
+        # Constant Acceleration (match RL env)
+        self.speed += CAR_ACCELERATION
+        
+        # Friction
+        if self.speed > 0:
+            self.speed -= CAR_FRICTION
 
         # Cap speed
-        self.speed = max(min(self.speed, CAR_MAX_SPEED), -CAR_MAX_SPEED/2)
+        self.speed = max(min(self.speed, CAR_MAX_SPEED), 0)
 
     def update(self):
         # Calculate velocity vector based on angle and speed
@@ -81,10 +74,65 @@ class Car:
         # Update self.rect to match the visible rotated bounding box for collision interactions
         self.rect = new_rect
 
+
+    def cast_rays(self, walls):
+        # Cast rays in a fan
+        # Return distances to walls
+        start = pygame.Vector2(self.x, self.y)
+        observations = []
+        # 5 rays: -60, -30, 0, 30, 60 degrees relative to car angle
+        angles = [-60, -30, 0, 30, 60]
+        
+        max_view_dist = 300
+        
+        for angle_offset in angles:
+            ray_angle = math.radians(self.angle + angle_offset)
+            # Ray direction
+            # Note: y is inverted in pygame (down is positive), so sin is negative for "up"
+            direction = pygame.Vector2(math.cos(ray_angle), -math.sin(ray_angle))
+            
+            # Simple raymarching or line intersection
+            # For simplicity in V0, let's do a coarse step check or line intersection with walls
+            # Line intersection is better
+            
+            closest_dist = max_view_dist
+            
+            end = start + direction * max_view_dist
+            
+            # Check intersection with each wall rect
+            # We treat walls as 4 lines
+            for wall in walls:
+                # Expand wall to lines? Or use clipline
+                # rect.clipline returns the segment of the line inside the rect
+                # If there is a segment, we take the distance to the start of the segment
+                
+                # However, walls are just rects. 
+                # If we are inside the track (island), the walls are the boundaries. 
+                # If we are outside, we are crashing.
+                
+                # Check if the line start->end intersects the wall rect
+                clipped = wall.clipline(start, end)
+                if clipped:
+                    # clipped is ((x1, y1), (x2, y2))
+                    # We want the point closest to start
+                    p1 = pygame.Vector2(clipped[0])
+                    p2 = pygame.Vector2(clipped[1])
+                    
+                    d1 = start.distance_to(p1)
+                    d2 = start.distance_to(p2)
+                    
+                    dist = min(d1, d2)
+                    if dist < closest_dist:
+                        closest_dist = dist
+            
+            observations.append(closest_dist / max_view_dist) # Normalize
+            
+        return observations
+
     def get_data(self):
-        # For RL later
-        return [self.x, self.y, self.speed, self.angle]
-    
+        # For RL later - basic state
+        return [self.speed / CAR_MAX_SPEED, self.angle / 360.0]
+
     def reset(self, x, y):
         self.x = x
         self.y = y

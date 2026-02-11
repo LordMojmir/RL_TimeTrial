@@ -1,0 +1,26 @@
+**********************
+* CHANGELOG     *
+**********************
+
+Project: Monaco Time Trial
+Author: Mojmir Horvath
+Course: CSC412 Winter 2025-2026
+
+----------------------
+Version 0.1.0
+2026-02-07
+----------------------
+- Fixed bug where the car did not reset its position after a crash (collision with walls).
+- Updated track colors: Changed background to ASPHALT and walls to GRASS_GREEN for better visuals.
+- Implemented a darker green outline for track boundaries to improve visibility.
+- Adjusted UI text colors for better contrast against the new background.
+
+----------------------
+Version 0.0.1
+2026-01-25
+----------------------
+- Initial project structure created with main.py, game.py, car.py, track.py, and utils.py.
+- Basic car physics implemented (acceleration, friction, braking, and steering).
+- Simple loop track layout designed with wall collision detection.
+- Added start line logic and a basic lap timer.
+- Implemented Menu and Playing states with keyboard navigation.
