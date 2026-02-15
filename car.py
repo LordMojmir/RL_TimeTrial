@@ -13,9 +13,11 @@ class Car:
         self.velocity_y = 0
         
         # Appearance
-        self.width = 40
-        self.height = 20
+        self.width = 60
+        self.height = 30
         self.color = RED
+        self.image = pygame.image.load("car.png")
+        self.image = pygame.transform.scale(self.image, (self.width, self.height))
         
         # Collision
         self.rect = pygame.Rect(x, y, self.width, self.height)
@@ -61,12 +63,7 @@ class Car:
 
     def draw(self, surface):
         # Rotate the car image (or rect)
-        # Since we are drawing primitives, we create a surface, draw rect, rotate surface
-        car_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        pygame.draw.rect(car_surface, self.color, (0, 0, self.width, self.height))
-        pygame.draw.polygon(car_surface, BLACK, [(self.width-5, 0), (self.width, self.height/2), (self.width-5, self.height)]) # Front indicator
-        
-        rotated_surface = pygame.transform.rotate(car_surface, self.angle)
+        rotated_surface = pygame.transform.rotate(self.image, self.angle)
         new_rect = rotated_surface.get_rect(center=(self.x, self.y))
         
         surface.blit(rotated_surface, new_rect.topleft)

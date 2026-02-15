@@ -34,7 +34,7 @@ class Game:
         self.state = "MENU" # MENU or PLAYING
         
         # Training Config
-        self.parallel_cars = 1000
+        self.parallel_cars = 10
         
         # Lap logic state
         self.crossed_start_line = False 
