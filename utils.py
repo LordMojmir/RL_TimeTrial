@@ -1,5 +1,9 @@
 import pygame
 
+"""
+Configuration constants and utility values for the game.
+"""
+
 # Screen
 SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720

@@ -7,6 +7,16 @@ Author: Mojmir Horvath
 Course: CSC412 Winter 2025-2026
 
 ----------------------
+Version 1.0.0
+2026-02-16
+----------------------
+- Implemented functional Reinforcement Learning (RL) agent using PPO.
+- Added Replay System to save and view best lap performances.
+- Introduced new Replay Timer UI component.
+- Visual Upgrade: Replaced red rectangle car with high-resolution Porsche GT3.
+- Optimized game loop for smoother training visualization.
+
+----------------------
 Version 0.1.0
 2026-02-07
 ----------------------

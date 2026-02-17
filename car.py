@@ -3,7 +3,18 @@ import math
 from utils import *
 
 class Car:
+    """
+    Car class representing the player/agent vehicle.
+    Handles physics, input, and rendering.
+    """
     def __init__(self, x, y):
+        """
+        Initialize the car.
+        
+        Args:
+            x (float): Initial x position.
+            y (float): Initial y position.
+        """
         # Physics state
         self.x = x
         self.y = y
@@ -16,8 +27,13 @@ class Car:
         self.width = 60
         self.height = 30
         self.color = RED
-        self.image = pygame.image.load("car.png")
-        self.image = pygame.transform.scale(self.image, (self.width, self.height))
+        try:
+            self.image = pygame.image.load("car.png")
+            self.image = pygame.transform.scale(self.image, (self.width, self.height))
+        except FileNotFoundError:
+            # Fallback if image not found
+            print("Warning: car.png not found. Using fallback rendering.")
+            self.image = None
         
         # Collision
         self.rect = pygame.Rect(x, y, self.width, self.height)
@@ -29,6 +45,9 @@ class Car:
         self.on_track = True
 
     def handle_input(self):
+        """
+        Handle keyboard input for manual control.
+        """
         keys = pygame.key.get_pressed()
         
         # Steering
@@ -48,6 +67,9 @@ class Car:
         self.speed = max(min(self.speed, CAR_MAX_SPEED), 0)
 
     def update(self):
+        """
+        Update car physics (velocity, position, bounding box).
+        """
         # Calculate velocity vector based on angle and speed
         rad_angle = math.radians(self.angle)
         self.velocity_x = math.cos(rad_angle) * self.speed
@@ -57,22 +79,43 @@ class Car:
         self.y += self.velocity_y
         
         # Update rect for rendering and collision (AABB)
-        # Note: To be more precise we should rotate the rect, but for V0 AABB is acceptable
-        # or we update the center
+        # Note: AABB is an approximation for rotated rectangles, but sufficient for this specific game
         self.rect.center = (self.x, self.y)
 
     def draw(self, surface):
-        # Rotate the car image (or rect)
-        rotated_surface = pygame.transform.rotate(self.image, self.angle)
-        new_rect = rotated_surface.get_rect(center=(self.x, self.y))
+        """
+        Draw the car on the given surface.
         
-        surface.blit(rotated_surface, new_rect.topleft)
+        Args:
+            surface (pygame.Surface): The surface to draw on.
+        """
+        if self.image:
+            # Rotate the car image
+            rotated_surface = pygame.transform.rotate(self.image, self.angle)
+            new_rect = rotated_surface.get_rect(center=(self.x, self.y))
+            surface.blit(rotated_surface, new_rect.topleft)
+        else:
+            # Fallback drawing (Red Block)
+            # This handles the case if image loading failed
+            car_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.rect(car_surface, self.color, (0, 0, self.width, self.height))
+            # Front indicator
+            pygame.draw.polygon(car_surface, BLACK, [(self.width-5, 0), (self.width, self.height/2), (self.width-5, self.height)]) 
+            
+            rotated_surface = pygame.transform.rotate(car_surface, self.angle)
+            new_rect = rotated_surface.get_rect(center=(self.x, self.y))
+            surface.blit(rotated_surface, new_rect.topleft)
         
-        # Update self.rect to match the visible rotated bounding box for collision interactions
-        self.rect = new_rect
-
-
     def cast_rays(self, walls):
+        """
+        Cast rays to detect walls for RL observation.
+        
+        Args:
+            walls (list of pygame.Rect): List of wall rectangles.
+            
+        Returns:
+            list: Normalized distances (0.0 to 1.0) for each ray.
+        """
         # Cast rays in a fan
         # Return distances to walls
         start = pygame.Vector2(self.x, self.y)
@@ -84,34 +127,15 @@ class Car:
         
         for angle_offset in angles:
             ray_angle = math.radians(self.angle + angle_offset)
-            # Ray direction
-            # Note: y is inverted in pygame (down is positive), so sin is negative for "up"
             direction = pygame.Vector2(math.cos(ray_angle), -math.sin(ray_angle))
             
-            # Simple raymarching or line intersection
-            # For simplicity in V0, let's do a coarse step check or line intersection with walls
-            # Line intersection is better
-            
             closest_dist = max_view_dist
-            
             end = start + direction * max_view_dist
             
             # Check intersection with each wall rect
-            # We treat walls as 4 lines
             for wall in walls:
-                # Expand wall to lines? Or use clipline
-                # rect.clipline returns the segment of the line inside the rect
-                # If there is a segment, we take the distance to the start of the segment
-                
-                # However, walls are just rects. 
-                # If we are inside the track (island), the walls are the boundaries. 
-                # If we are outside, we are crashing.
-                
-                # Check if the line start->end intersects the wall rect
                 clipped = wall.clipline(start, end)
                 if clipped:
-                    # clipped is ((x1, y1), (x2, y2))
-                    # We want the point closest to start
                     p1 = pygame.Vector2(clipped[0])
                     p2 = pygame.Vector2(clipped[1])
                     
@@ -127,10 +151,23 @@ class Car:
         return observations
 
     def get_data(self):
+        """
+        Get normalized state data for RL.
+        
+        Returns:
+            list: [normalized_speed, normalized_angle]
+        """
         # For RL later - basic state
         return [self.speed / CAR_MAX_SPEED, self.angle / 360.0]
 
     def reset(self, x, y):
+        """
+        Reset car to a specific position.
+        
+        Args:
+            x (float): New x position.
+            y (float): New y position.
+        """
         self.x = x
         self.y = y
         self.speed = 0

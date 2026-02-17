@@ -2,13 +2,22 @@ import pygame
 from utils import SCREEN_WIDTH, SCREEN_HEIGHT, ASPHALT, BARRIER_COLOR, WHITE, GRASS_GREEN
 
 class Track:
+    """
+    Track class representing the race track walls and checkpoints.
+    """
     def __init__(self):
+        """
+        Initialize the track.
+        """
         self.walls = []
         self.checkpoints = [] # For valid lap detection (optional for v0)
         self.start_line = None
         self._create_track()
 
     def _create_track(self):
+        """
+        Define the track geometry (walls, start line).
+        """
         # Create a simple loop track
         # Outer boundaries
         outer_margin = 50
@@ -37,6 +46,12 @@ class Track:
         )
 
     def draw(self, surface):
+        """
+        Draw the track walls and surface.
+        
+        Args:
+            surface (pygame.Surface): The surface to draw on.
+        """
         surface.fill(ASPHALT)
         
         # Draw Walls (Grass)
@@ -48,10 +63,14 @@ class Track:
         pygame.draw.rect(surface, WHITE, self.start_line)
     
     def check_collision(self, car_rect):
-        # collided_vals = car_rect.collidelistall(self.walls)
-        # return len(collided_vals) > 0
+        """
+        Check if the car has collided with any wall.
         
-        # More precise: check if any wall collides with the car rect
-        # Note: car_rect here should be the passed AABB from the car
+        Args:
+            car_rect (pygame.Rect): The car's bounding box.
+            
+        Returns:
+            bool: True if collision detected, False otherwise.
+        """
         index = car_rect.collidelist(self.walls)
         return index != -1
