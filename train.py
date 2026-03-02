@@ -325,10 +325,22 @@ def watch():
          
          # Fallback to pure rect rendering to ensure color works 
          env.game.car.color = RED
-         env.game.car.image = "car2.png"
+         try:
+             img = pygame.image.load("car2.png")
+            # Todo add to flip car the rigth way
+            #  img = pygame.transform.flip(img, True, False)
+             env.game.car.image = pygame.transform.scale(img, (env.game.car.width, env.game.car.height))
+         except Exception:
+             env.game.car.image = None
+             
          env.game.car.draw(screen) # Agent car
          
-         player_car.image = "car.png"
+         try:
+             img = pygame.image.load("car.png")
+             player_car.image = pygame.transform.scale(img, (player_car.width, player_car.height))
+         except Exception:
+             player_car.image = None
+             
          player_car.draw(screen)   # Player car
          
          # Draw UI
