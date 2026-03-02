@@ -267,8 +267,9 @@ def replay_best_runs(screen, font, best_times, track):
              time.sleep(1)
 
 def watch():
-    env = CarRacingEnv(render_mode="human")
-    agent = PPOAgent(num_inputs=7, num_outputs=2)
+    # Render mode rgb_array so we can handle custom concurrent rendering
+    env = CarRacingEnv(render_mode="rgb_array")
+    agent = PPOAgent(num_inputs=7, num_outputs=1)
     try:
         agent.load("ppo_model.pth")
         print("Model loaded.")
@@ -278,11 +279,22 @@ def watch():
     obs, _ = env.reset()
     done = False
     
+    from car import Car
+    from utils import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, BLUE, RED
+    
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Agent vs Player")
+    font = pygame.font.SysFont("Verdana", 24)
+    
+    start_x = SCREEN_WIDTH / 2 - 100
+    start_y = SCREEN_HEIGHT - 150
+    player_car = Car(start_x + 80, start_y)
+    player_car.color = BLUE
+    
     running = True
     clock = pygame.time.Clock()
     
     while running:
-         # Need to handle events to prevent freezing
          for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -290,17 +302,41 @@ def watch():
                 if event.key == pygame.K_ESCAPE:
                     running = False
          
-         # The env has a game instance, but we need to step the agent
+         # Player input & update
+         player_car.handle_input()
+         player_car.update()
+         
+         # Agent step
+         # action[0] is passed to the env (shape 1, thanks to num_outputs=1)
          action, _, _ = agent.select_action(obs)
-         obs, reward, terminated, truncated, _ = env.step(action)
+         obs, reward, terminated, truncated, _ = env.step(action[0])
          done = terminated or truncated
          
+         if env.game.track.check_collision(player_car.rect):
+             player_car.reset(start_x + 80, start_y)
+             obs, _ = env.reset() # Reset agent as well
+             
          if done:
              obs, _ = env.reset()
+             player_car.reset(start_x + 80, start_y) # Reset player as well
              
+         # Custom Render
+         env.game.track.draw(screen)
+         
+         # Fallback to pure rect rendering to ensure color works 
+         env.game.car.color = RED
+         env.game.car.image = "car2.png"
+         env.game.car.draw(screen) # Agent car
+         
+         player_car.image = "car.png"
+         player_car.draw(screen)   # Player car
+         
+         # Draw UI
+         ui_text = font.render("Red: Agent | Blue: Player (Use Arrows)", True, WHITE)
+         screen.blit(ui_text, (20, 20))
+         
+         pygame.display.flip()
          clock.tick(60)
-             
-    env.close()
 
 if __name__ == "__main__":
     import sys
