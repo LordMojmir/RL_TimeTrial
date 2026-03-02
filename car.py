@@ -70,10 +70,17 @@ class Car:
         """
         Update car physics (velocity, position, bounding box).
         """
-        # Calculate velocity vector based on angle and speed
+        # --- Velocity Vector Math ---
+        # Convert degrees to radians for math functions
         rad_angle = math.radians(self.angle)
+        
+        # Calculate X/Y vector components using trigonometry.
+        # cos(angle) gives horizontal ratio, sin(angle) gives vertical ratio.
+        # Multiply by speed (magnitude) to get the velocity vector.
         self.velocity_x = math.cos(rad_angle) * self.speed
-        self.velocity_y = -math.sin(rad_angle) * self.speed # Y is flipped in pygame
+        
+        # Y is flipped because in Pygame, y=0 is the TOP of the screen.
+        self.velocity_y = -math.sin(rad_angle) * self.speed
         
         self.x += self.velocity_x
         self.y += self.velocity_y
@@ -125,20 +132,29 @@ class Car:
         
         max_view_dist = 300
         
+        # --- Raycasting Geometry Math ---
         for angle_offset in angles:
+            # Shift ray angle relative to car's current rotation
             ray_angle = math.radians(self.angle + angle_offset)
+            
+            # Create a normalized direction vector mapping the trajectory of the ray
+            # (Y is negative as Pygame coordinates draw downwards)
             direction = pygame.Vector2(math.cos(ray_angle), -math.sin(ray_angle))
             
             closest_dist = max_view_dist
+            
+            # Project the ray outwards to its max sensing distance
             end = start + direction * max_view_dist
             
-            # Check intersection with each wall rect
+            # Check intersection with each wall rect using Pygame's line clipping algorithm
             for wall in walls:
                 clipped = wall.clipline(start, end)
                 if clipped:
+                    # If intersected, clipline returns the bounding coordinates on the rect's edge
                     p1 = pygame.Vector2(clipped[0])
                     p2 = pygame.Vector2(clipped[1])
                     
+                    # Calculate euclidean distance from car to intersection constraints
                     d1 = start.distance_to(p1)
                     d2 = start.distance_to(p2)
                     

@@ -1,3 +1,13 @@
+"""
+Name: Mojmir
+Version: 1.1
+Game Description: RL TimeTrial: Monaco - A 2D top-down racing game where a PPO agent learns to drive.
+New to this Version:
+- Agent vs Player ("Duel Mode") with custom car sprite skins.
+- Dynamic ghost replay for high scores.
+- Fixed 0-dimensional array crash in model observation.
+"""
+
 import pygame
 import numpy as np
 import time
@@ -6,6 +16,13 @@ from agent import PPOAgent
 from utils import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE
 
 def train():
+    """
+    Main training loop for the PPO agent.
+    
+    Instantiates multiple parallel racing environments to collect
+    experience data, steps the neural network policies, computes
+    advantages using GAE, and updates the PPO model asynchronously.
+    """
     parallel_cars = 10
     num_envs = parallel_cars
     
@@ -212,6 +229,15 @@ def train():
     # pygame.quit() # Don't quit, return to menu
 
 def replay_best_runs(screen, font, best_times, track):
+    """
+    Replays the best lap times recorded by the agent using 'ghost' cars.
+    
+    Args:
+        screen (pygame.Surface): The main Pygame display surface.
+        font (pygame.font.Font): The font used for rendering text.
+        best_times (list): A list of dictionaries containing lap history data.
+        track (Track): The track geometry instance to render on the background.
+    """
     print("Replaying Best Runs...")
     from car import Car
     
@@ -267,6 +293,11 @@ def replay_best_runs(screen, font, best_times, track):
              time.sleep(1)
 
 def watch():
+    """
+    Executes the 'Duel Mode' (Agent vs Player) where a pre-trained model
+    is loaded and driven as the Red Car, while the user controls the Blue Car.
+    Both cars operate simultaneously on the same Pygame surface.
+    """
     # Render mode rgb_array so we can handle custom concurrent rendering
     env = CarRacingEnv(render_mode="rgb_array")
     agent = PPOAgent(num_inputs=7, num_outputs=1)
