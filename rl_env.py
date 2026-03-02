@@ -9,6 +9,13 @@ class CarRacingEnv(gym.Env):
     metadata = {'render_modes': ['human', 'rgb_array'], 'render_fps': 60}
 
     def __init__(self, render_mode=None):
+        """
+        Initializes the racing environment, setting up the game instance
+        and defining the Gymnasium Action and Observation spaces.
+        
+        Args:
+            render_mode (str, optional): 'human' for Pygame window, 'rgb_array' for headless vector arrays. Defaults to None.
+        """
         self.game = Game(headless=(render_mode != "human"))
         self.game.state = "PLAYING"
         # We need to decouple the game loop for Gym
@@ -27,6 +34,16 @@ class CarRacingEnv(gym.Env):
         self.observation_space = spaces.Box(low=0, high=1, shape=(7,), dtype=np.float32)
         
     def reset(self, seed=None, options=None):
+        """
+        Resets the environment to its initial state, placing the car at the starting line.
+        
+        Args:
+            seed (int, optional): Random seed. Defaults to None.
+            options (dict, optional): Additional options. Defaults to None.
+            
+        Returns:
+            tuple: (Observation numpy array, Info dictionary)
+        """
         super().reset(seed=seed)
         self.game.reset()
         
@@ -36,6 +53,18 @@ class CarRacingEnv(gym.Env):
         return observation, info
 
     def step(self, action):
+        """
+        Executes one time step within the environment based on the provided action.
+        
+        Applies steering to the car, updates physics calculations, checks for wall 
+        collisions, assigns rewards/penalties, and evaluates terminal states.
+        
+        Args:
+            action (np.array): Action array containing the steering value [-1.0, 1.0].
+            
+        Returns:
+            tuple: (Observation, Reward, Terminated boolean, Truncated boolean, Info dictionary)
+        """
         # Action is [steering]
         steering = float(action[0])
         accel = 1.0 # Always max acceleration
@@ -122,6 +151,15 @@ class CarRacingEnv(gym.Env):
         return observation, reward, terminated, truncated, info
 
     def _get_obs(self):
+        """
+        Gathers the current state observation for the RL Agent.
+        
+        Combines the 5 normalized raycast wall distances with the car's 
+        internal state (normalized speed, normalized angle).
+        
+        Returns:
+            np.array: A 1D array of length 7 containing the observation space values.
+        """
         rays = self.game.car.cast_rays(self.game.track.walls)
         car_data = self.game.car.get_data() # [speed_norm, angle_norm]
         
@@ -129,7 +167,9 @@ class CarRacingEnv(gym.Env):
         return obs
 
     def render(self):
+        """Force a manual rendering of the Pygame environment surface."""
         self.game.draw()
         
     def close(self):
+        """Clean up and close the Pygame window."""
         pygame.quit()

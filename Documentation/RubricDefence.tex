@@ -11,23 +11,23 @@
 \maketitle
 
 \section*{Volume of Work}
-I took it a step further than just a standard top-down PyGame racer to integrating a full Reinforcement Learning environment is quite the substantial increase of work. In this final version, I implemented a Proximal Policy Optimization agent using PyTorch, built a custom Gymnasium wrapper \texttt{(rl\_env.py)} to bridge the AI with the game, and created a 2D raycasting system to act as the car's LIDAR sensors to enable the car to interact with its enviroment. Furthermore, I built a parallel environment training loop and a ghost-car replay system to watch the AI's best runs.
+I took it a step further than just a standard top-down PyGame racer to integrating a full Reinforcement Learning environment is quite the substantial increase of work. In this final version, I implemented a Proximal Policy Optimization agent using PyTorch, built a custom Gymnasium wrapper \texttt{(rl\_env.py)} to bridge the AI with the game, and created a 2D ray-casting system to act as the car's LIDAR sensors to enable the car to interact with its environment. Furthermore, I built a parallel environment training loop and a ghost-car replay system to watch the AI's best runs.
 
 \section*{Cohesiveness}
-Despite adding a neural network training to the codebase, the game remains functionally cohesive. The user experience is not confusing; the main menu seamlessly splitts between the human-playable time trial, the AI training mode, and the AI vs Player mode without requiring restarts or script changes. The new mechanics (like raycasting and the PPO agent) are tightly bundled into their respective classes (\texttt{Agent, Car, Track}), ensuring the core game loop remains clean.
+Despite adding a neural network training to the codebase, the game remains functionally cohesive. The user experience is not confusing; the main menu seamlessly splits between the human-playable time trial, the AI training mode, and the AI vs Player mode without requiring restarts or script changes. The new mechanics (like ray-casting and the PPO agent) are tightly bundled into their respective classes (\texttt{Agent, Car, Track}), ensuring the core game loop remains clean.
 
 \section*{Playability / User Experience}
 The application prioritizes user experience by providing clear, on-screen instructions on the main menu (Enter to Play, T to Train, W to Battle). Even though I could start talking about various quality of life, I believe that how much my friends got hocked on the game speaks more volume. They kept playing mastering the game, improving their times and the never dying RL agent battle mode just kept them engaged for a long time.
 
 \section*{Structure of Code}
-The code intentionally deviates slightly from a singular PyGame template to support object-oriented modularity and machine learning requirements. Files are logically separated by responsibility (\texttt{car.py} for kinematics/sensors, \texttt{track.py} for geometry, \texttt{agent.py} for the neural network, and \texttt{ rl\_env.py} for the Gym API). This seperation was necessary to allow the game logic to run wihtout a UI during AI training while still functioning as a standard PyGame application for human players, when not in action.
+The code intentionally deviates slightly from a singular PyGame template to support object-oriented modularity and machine learning requirements. Files are logically separated by responsibility (\texttt{car.py} for kinematics/sensors, \texttt{track.py} for geometry, \texttt{agent.py} for the neural network, and \texttt{ rl\_env.py} for the Gym API). This separation was necessary to allow the game logic to run without a UI during AI training while still functioning as a standard PyGame application for human players, when not in action.
 
 \section*{Comments}
-I have ensured that all files have the proper documentation in them. All functions should have the necessary docstrings assigned to them. Not 
+I have ensured that all files have the proper documentation in them. All functions should have the necessary docstrings assigned to them. Not all mathematical ML implementation are explained for every peer to understand but for someone who has a rudimentary understanding of ML should be able to pick up the project fairly quickly. 
+
 \section*{Personal Push}
-% Paste the Personal Push text here
+This project was a personal push beyond the standard scope of a game dev CS class. Instead of just building a fun game, which Monaco Time Trial for sure is, I added the personal push of taking it a step further and enhancing the fun of playing by training a RL agent. I haven't before developed games nor to many RL agents, both were new topic i had to explore and learn. 
 
 \section*{Fun}
-% Paste the Fun text here
-
+The addition of the ghost replay system improved the fun factor significantly when training. Instead of just looking at the reward increasing, you can see how the agents train and fail. It's interactive, it enables you to understand what might be wrong with your rewards, or current setup. I spend so much time watching the agents being trained, running into walls and learning from it.  
 \end{document}
